@@ -100,7 +100,7 @@
 
 
     function loadQuestion() {
-      fetch('http://localhost:3001/quiz/image')
+      fetch('https://kang-teacher.github.io/web2:443/quiz/image')
         .then(r => r.json())
         .then(data => {
           current = data;
@@ -164,7 +164,7 @@
     // 기존 소리 API 테스트(참고용)
     function getSound() {
       const name = document.getElementById('name').value;
-      fetch(`http://localhost:3001/sound/${name}`)
+      fetch(`https://kang-teacher.github.io/web2:443/sound/${name}`)
         .then((response) => response.json())
         .then((data) => {
           document.getElementById('sound').innerHTML = data.sound || '';
@@ -179,6 +179,7 @@
   </script>
 </body>
 </html>
+
 
 
 
