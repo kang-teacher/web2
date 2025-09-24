@@ -3,9 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>동물 소리/이미지 퀴즈</title>
+  <title>동물 소리/이미지 퀴즈 (GitHub Pages용, 백엔드 없음)</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width: 720px; margin: 24px auto; padding: 0 16px; }
+    :root { --duration: 320ms; }
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; max-width: 720px; margin: 24px auto; padding: 0 16px; }
+    h1,h2 { margin: 6px 0 10px; }
     .row { margin: 12px 0; }
     #imageBox img { max-width: 100%; height: auto; border-radius: 12px; }
     .options { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 12px; }
@@ -15,131 +17,200 @@
     .ok { color: #0a7a2f; }
     .bad { color: #b00020; }
     .pill { display:inline-block; padding: 4px 10px; border:1px solid #eee; border-radius:20px; margin-right:8px; }
+
+    /* 페이지 전환(슬라이드 + 페이드) */
+    .page { position: relative; }
+    .page.hidden {
+      pointer-events: none;
+      opacity: 0;
+      transform: translateX(18px);
+      transition: opacity var(--duration) ease, transform var(--duration) ease;
+      height: 0; overflow: hidden; margin: 0; padding: 0;
+    }
+    .page.active {
+      opacity: 1;
+      transform: translateX(0);
+      transition: opacity var(--duration) ease, transform var(--duration) ease;
+    }
   </style>
 </head>
 <body>
   <h1>동물 이미지 퀴즈</h1>
 
-
-  <div class="row">
-    <span class="pill">점수: <span id="score">0</span></span>
-    <span class="pill">문제: <span id="round">0</span>/<span id="total">5</span></span>
-  </div>
-
-
-  <div class="row">
+  <!-- 랜딩(첫 화면) -->
+  <section id="landing" class="page active">
+    <p class="row">버튼을 누르면 퀴즈 페이지로 이동합니다.</p>
     <button id="startBtn">퀴즈 시작</button>
-    <button id="nextBtn" style="display:none">다음 문제</button>
-  </div>
+    <hr class="row"/>
 
+    <!-- (백엔드 없이) 소리 테스트: 로컬 데이터에서 조회 -->
+    <h2>소리 테스트 (로컬 데이터)</h2>
+    <div class="row">
+      <input id="name" type="text" placeholder="dog / cat / pig / lion / tiger"/>
+      <button id="soundBtn">조회</button>
+    </div>
+    <h3 id="sound"></h3>
+    <div id="imgFromSound"></div>
+  </section>
 
-  <div id="quizArea" style="display:none">
-    <div id="imageBox" class="row"></div>
-    <div id="options" class="options"></div>
-    <div id="result" class="status"></div>
-  </div>
+  <!-- 퀴즈 화면 -->
+  <section id="quiz" class="page hidden">
+    <div class="row">
+      <span class="pill">점수: <span id="score">0</span></span>
+      <span class="pill">문제: <span id="round">0</span>/<span id="total">5</span></span>
+    </div>
 
+    <div class="row">
+      <button id="nextBtn" style="display:none">다음 문제</button>
+      <button id="backBtn">메인으로</button>
+    </div>
 
-  <hr class="row"/>
-
-
-  <h2>소리 API 테스트</h2>
-  <div class="row">
-    <input id="name" type="text" placeholder="dog / cat / pig"/>
-    <button onclick="getSound()">API 요청</button>
-  </div>
-  <h3 id="sound"></h3>
-  <div id="imgFromSound"></div>
-
+    <div id="quizArea">
+      <div id="imageBox" class="row"></div>
+      <div id="options" class="options"></div>
+      <div id="result" class="status"></div>
+    </div>
+  </section>
 
   <script>
+    /* =========================
+       1) 동물 데이터 (정적)
+       - 백엔드 호출 없이 이 배열에서 문제를 생성합니다.
+       - 이미지 URL은 직접 이미지 파일이어야 합니다(구글 리디렉트 X).
+       ========================= */
+    const ANIMALS = [
+      {
+        key: 'dog',
+        sound: '멍멍',
+        // 기존에 쓰시던 강아지 이미지 (직접 이미지 URL)
+        img: 'https://m.health.chosun.com/site/data/img_dir/2025/04/08/2025040803041_0.jpg'
+      },
+      {
+        key: 'cat',
+        sound: '야옹',
+        // 나무위키 이미지 (직접 URL, hotlink가 안 될 경우를 대비해 다른 소스로 바꿔도 됩니다)
+        img: 'https://i.namu.wiki/i/d1A_wD4kuLHmOOFqJdVlOXVt1TWA9NfNt_HA0CS0Y_N0zayUAX8olMuv7odG2FiDLDQZIRBqbPQwBSArXfEJlQ.webp'
+      },
+      {
+        key: 'lion',
+        sound: '어흥',
+        img: 'https://i.namu.wiki/i/dADnIJgMlDTjaoRfC5Mf9EzpE9m0xyxx4U6MKpIDwzX6zhkLcHsetHvdem00_lRLfxyJVmIdVm3ED4k9OBac3Q.webp'
+      },
+      {
+        key: 'tiger',
+        sound: '어↗흥',
+        img: 'https://i.namu.wiki/i/XNq9TnZ6IzRBQYflYw3_VrjTw1_K5vV2e3etPk7gkL259Ntdb2qk8NAUALJOkzZiap7mipxM6Y8-kNyPEmbUzYEtpRbriNHdehqqhWirw3kb7b6yxP740YMDykSImGknyaO0BNY6880mk1BxAT7Nqg.webp'
+      },
+      {
+        key: 'pig',
+        sound: '꿀꿀',
+        // 구글 리디렉트는 X → 직접 파일 URL 사용(예: 위키미디어)
+        img: 'https://upload.wikimedia.org/wikipedia/commons/2/28/Pig_in_a_field.jpg'
+      }
+    ];
+
+    // 문제 수 및 상태값
     const TOTAL_ROUNDS = 5;
-    document.getElementById('total').textContent = TOTAL_ROUNDS;
-
-
-    let current = null;  // { img, options, answer }
+    let current = null;   // { img, options, answer }
     let canAnswer = false;
     let score = 0;
     let round = 0;
 
-
+    // 엘리먼트 캐시
+    const landing = document.getElementById('landing');
+    const quiz = document.getElementById('quiz');
     const startBtn = document.getElementById('startBtn');
+    const backBtn = document.getElementById('backBtn');
     const nextBtn = document.getElementById('nextBtn');
-    const quizArea = document.getElementById('quizArea');
     const imageBox = document.getElementById('imageBox');
     const optionsEl = document.getElementById('options');
     const resultEl = document.getElementById('result');
     const scoreEl = document.getElementById('score');
     const roundEl = document.getElementById('round');
+    const totalEl = document.getElementById('total');
+    totalEl.textContent = TOTAL_ROUNDS;
 
+    // 페이지 전환
+    function showPage(which) {
+      if (which === 'quiz') {
+        landing.classList.remove('active'); landing.classList.add('hidden');
+        quiz.classList.remove('hidden'); quiz.classList.add('active');
+      } else {
+        quiz.classList.remove('active'); quiz.classList.add('hidden');
+        landing.classList.remove('hidden'); landing.classList.add('active');
+      }
+    }
 
+    // 시작 버튼
     startBtn.addEventListener('click', () => {
-      score = 0; round = 0;
-      scoreEl.textContent = score;
-      roundEl.textContent = round;
-      startBtn.style.display = 'none';
+      // 초기화
+      score = 0; round = 0; current = null; canAnswer = false;
+      scoreEl.textContent = score; roundEl.textContent = round;
+      resultEl.textContent = ''; imageBox.innerHTML = ''; optionsEl.innerHTML = '';
       nextBtn.style.display = 'inline-block';
-      quizArea.style.display = 'block';
+      nextBtn.textContent = '다음 문제';
+
+      showPage('quiz');
       loadQuestion();
     });
 
+    // 뒤로 가기
+    backBtn.addEventListener('click', () => showPage('main'));
 
+    // 다음 문제
     nextBtn.addEventListener('click', () => {
       if (round >= TOTAL_ROUNDS) {
-        // 게임 리셋
-        startBtn.style.display = 'inline-block';
-        nextBtn.style.display = 'none';
-        quizArea.style.display = 'none';
-        resultEl.textContent = '';
-        imageBox.innerHTML = '';
-        optionsEl.innerHTML = '';
+        // 게임 종료 후 메인으로
+        showPage('main');
         return;
       }
       loadQuestion();
     });
 
-
+    // 문제 생성 (로컬 데이터 사용)
     function loadQuestion() {
-      fetch('https://kang-teacher.github.io/web2:443/quiz/image')
-        .then(r => r.json())
-        .then(data => {
-          current = data;
-          round++;
-          roundEl.textContent = round;
-          resultEl.textContent = '';
+      // 이미지가 있는 동물만 사용
+      const pool = ANIMALS.filter(a => !!a.img);
+      if (pool.length < 2) {
+        resultEl.textContent = '이미지 있는 동물이 2개 이상 필요합니다.';
+        resultEl.className = 'status bad';
+        return;
+      }
 
+      // 정답 선택
+      const answerIndex = Math.floor(Math.random() * pool.length);
+      const answer = pool[answerIndex];
 
-          // 문제 화면 렌더
-          imageBox.innerHTML = `<img src="${data.img}" alt="animal">`;
-          optionsEl.innerHTML = '';
-          data.options.forEach(opt => {
-            const btn = document.createElement('button');
-            btn.textContent = opt;
-            btn.addEventListener('click', () => choose(opt));
-            optionsEl.appendChild(btn);
-          });
-          canAnswer = true;
+      // 보기 구성 (최대 4지선다)
+      const names = shuffle([...pool.map(a => a.key)]);
+      const optCount = Math.min(4, names.length);
+      let options = unique([answer.key, ...names]).slice(0, optCount);
+      if (!options.includes(answer.key)) options[0] = answer.key;
+      options = shuffle(options);
 
+      // 상태 업데이트/렌더링
+      current = { img: answer.img, options, answer: answer.key };
+      round++;
+      roundEl.textContent = round;
+      resultEl.textContent = '';
 
-          // 마지막 문제 이후 버튼 문구 변경
-          if (round === TOTAL_ROUNDS) {
-            nextBtn.textContent = '결과 보기';
-          } else {
-            nextBtn.textContent = '다음 문제';
-          }
-        })
-        .catch(err => {
-          console.error(err);
-          resultEl.textContent = '문제를 불러오지 못했습니다.';
-          resultEl.className = 'status bad';
-        });
+      imageBox.innerHTML = `<img src="${current.img}" alt="animal">`;
+      optionsEl.innerHTML = '';
+      current.options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.textContent = opt;
+        btn.addEventListener('click', () => choose(opt));
+        optionsEl.appendChild(btn);
+      });
+      canAnswer = true;
+
+      nextBtn.textContent = (round === TOTAL_ROUNDS) ? '결과 보기' : '다음 문제';
     }
 
-
+    // 정답 체크
     function choose(opt) {
       if (!canAnswer) return;
       canAnswer = false;
-
 
       if (opt === current.answer) {
         score++;
@@ -151,8 +222,6 @@
         resultEl.className = 'status bad';
       }
 
-
-      // 모든 문제가 끝났을 때 결과 메시지
       if (round === TOTAL_ROUNDS) {
         setTimeout(() => {
           resultEl.textContent = `퀴즈 종료 — 점수: ${score}/${TOTAL_ROUNDS}`;
@@ -160,26 +229,24 @@
       }
     }
 
+    // 소리 테스트 (로컬 데이터)
+    document.getElementById('soundBtn').addEventListener('click', () => {
+      const name = document.getElementById('name').value.trim().toLowerCase();
+      const item = ANIMALS.find(a => a.key === name);
+      document.getElementById('sound').textContent = item?.sound ?? '알 수 없음';
+      document.getElementById('imgFromSound').innerHTML =
+        item?.img ? `<img src="${item.img}" alt="${name}" width="320">` : '';
+    });
 
-    // 기존 소리 API 테스트(참고용)
-    function getSound() {
-      const name = document.getElementById('name').value;
-      fetch(`https://kang-teacher.github.io/web2:443/sound/${name}`)
-        .then((response) => response.json())
-        .then((data) => {
-          document.getElementById('sound').innerHTML = data.sound || '';
-          if (data.img) {
-            document.getElementById('imgFromSound').innerHTML =
-              `<img src="${data.img}" alt="${name}" width="300">`;
-          } else {
-            document.getElementById('imgFromSound').innerHTML = '';
-          }
-        });
+    // 유틸: 셔플/중복제거
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
     }
+    function unique(arr) { return Array.from(new Set(arr)); }
   </script>
 </body>
 </html>
-
-
-
-
